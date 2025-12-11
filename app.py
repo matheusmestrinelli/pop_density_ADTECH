@@ -33,6 +33,17 @@ st.markdown("""
     /* Hide sidebar toggle button */
     [data-testid="collapsedControl"] {display: none;}
     
+    /* Hide "Made with Streamlit" footer */
+    footer {visibility: hidden;}
+    footer:after {
+        content:''; 
+        visibility: visible;
+        display: block;
+        position: relative;
+        padding: 5px;
+        top: 2px;
+    }
+    
     /* AL Drones Color Palette */
     :root {
         --aldrones-teal: #054750;
@@ -292,11 +303,11 @@ def create_header():
                  alt="AL Drones Logo" 
                  style="height: 70px; object-fit: contain;">
             <div style="width: 2px; height: 100px; background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.4), transparent);"></div>
-            <img src="https://adtechsd.com.br/wp-content/uploads/2023/03/logo-adtech-mbr-b-2048x780.png" 
-                 alt="Adtech Logo" 
+            <img src="https://www.omnibrasil.com.br/assets/home/img/logo-branco-omni.png" 
+                 alt="Omni Logo" 
                  style="height: 70px; object-fit: contain;">
         </div>
-        <h1 style="text-align: center;">Análise da Área de Voo para o Harpia</h1>
+        <h1 style="text-align: center;">Análise da Área de Voo para o SwissDrones SDO 50 V3</h1>
     </div>
     """, unsafe_allow_html=True)
 

@@ -44,10 +44,10 @@ st.markdown("""
         top: 2px;
     }
     
-    /* Hide "Created by" link in bottom right */
-    [data-testid="stStatusWidget"] {display: none;}
-    .stAppViewBlockContainer {padding-bottom: 0;}
-    div[data-testid="stToolbar"] {display: none;}
+    /* Hide "Created by" link in bottom right (keep "Hosted by") */
+    a[href*="~"] {display: none !important;}
+    .viewerBadge_container__r5tak {display: none !important;}
+    .styles_viewerBadge__CiemY {display: none !important;}
     
     /* AL Drones Color Palette */
     :root {

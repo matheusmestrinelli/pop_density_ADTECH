@@ -44,6 +44,11 @@ st.markdown("""
         top: 2px;
     }
     
+    /* Hide "Created by" link in bottom right */
+    [data-testid="stStatusWidget"] {display: none;}
+    .stAppViewBlockContainer {padding-bottom: 0;}
+    div[data-testid="stToolbar"] {display: none;}
+    
     /* AL Drones Color Palette */
     :root {
         --aldrones-teal: #054750;

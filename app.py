@@ -666,3 +666,85 @@ def main():
                 - É necessária a criação de **No Fly Zones** sobre as células identificadas
                 - Consulte a tabela detalhada abaixo para localizar as células críticas
                 """)
+
+
+            # Detailed Population Statistics Table
+            st.markdown("---")
+            st.markdown("## 📊 Estatísticas Detalhadas por Camada")
+
+            if 'stats' in results:
+                import pandas as pd
+                stats_data = []
+                for layer, stat in results['stats'].items():
+                    stats_data.append({
+                        'Camada': layer,
+                        'População Total': int(stat['total_pessoas']),
+                        'Área (km²)': round(stat['area_km2'], 2),
+                        'Densidade Média (hab/km²)': round(stat['densidade_media'], 2),
+                        'Densidade Máxima (hab/km²)': round(stat['densidade_maxima'], 2)
+                    })
+                stats_df = pd.DataFrame(stats_data)
+                st.dataframe(stats_df, use_container_width=True, hide_index=True)
+
+            # Display maps
+            st.markdown("---")
+            st.markdown("## 🗺️ Mapas de Densidade Populacional")
+
+            maps = [
+                ('map_flight_geography.png', 'Flight Geography'),
+                ('map_ground_risk_buffer.png', 'Ground Risk Buffer'),
+                ('map_adjacent_area.png', 'Adjacent Area')
+            ]
+
+            for map_file, map_title in maps:
+                map_path = os.path.join(analysis_output_dir, map_file)
+                if os.path.exists(map_path):
+                    st.markdown(f"### {map_title}")
+                    st.image(map_path, use_container_width=True)
+
+            # Download results - KML and Maps together
+            st.markdown("---")
+            st.markdown("## 📥 Download dos Resultados")
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            # KML download
+            with col1:
+                st.download_button(
+                    label="📥 Margens de Segurança",
+                    data=kml_data,
+                    file_name='safety_margins.kml',
+                    mime='application/vnd.google-earth.kml+xml',
+                    key='download_kml_final',
+                    use_container_width=True
+                )
+
+            # Map downloads
+            map_labels = ['📥 Mapa FG', '📥 Mapa GRB', '📥 Mapa AA']
+            for idx, (map_file, map_title) in enumerate(maps):
+                map_path = os.path.join(analysis_output_dir, map_file)
+                if os.path.exists(map_path):
+                    with [col2, col3, col4][idx]:
+                        with open(map_path, 'rb') as f:
+                            file_data = f.read()
+                            st.download_button(
+                                label=map_labels[idx],
+                                data=file_data,
+                                file_name=map_file,
+                                mime='image/png',
+                                use_container_width=True,
+                                key=f"download_map_{idx}"
+                            )
+
+    # Footer
+    st.markdown("""
+    <div class="footer">
+        <p>© 2025 AL Drones - Todos os direitos reservados</p>
+        <p>Desenvolvido pela AL Drones | 
+        <a href="https://aldrones.com.br" target="_blank">aldrones.com.br</a></p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+if __name__ == '__main__':
+    main()

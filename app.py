@@ -667,84 +667,143 @@ def main():
                 - Consulte a tabela detalhada abaixo para localizar as células críticas
                 """)
 
+            # Tabela Detalhada de Células do GRB
+            if 'Ground Risk Buffer' in results and 'detailed_cells' in results['Ground Risk Buffer']:
+                detailed_cells = results['Ground Risk Buffer']['detailed_cells']
 
-            # Detailed Population Statistics Table
-            st.markdown("---")
-            st.markdown("## 📊 Estatísticas Detalhadas por Camada")
+                if not detailed_cells.empty:
+                    st.markdown("---")
+                    st.markdown("## 📋 Células do Ground Risk Buffer")
 
-            if 'stats' in results:
-                import pandas as pd
-                stats_data = []
-                for layer, stat in results['stats'].items():
-                    stats_data.append({
-                        'Camada': layer,
-                        'População Total': int(stat['total_pessoas']),
-                        'Área (km²)': round(stat['area_km2'], 2),
-                        'Densidade Média (hab/km²)': round(stat['densidade_media'], 2),
-                        'Densidade Máxima (hab/km²)': round(stat['densidade_maxima'], 2)
+                    # Estatísticas rápidas
+                    total_cells = len(detailed_cells)
+                    cells_above_5 = len(detailed_cells[detailed_cells['Densidade_hab_km2'] > 5])
+                    cells_above_0 = len(detailed_cells[detailed_cells['Densidade_hab_km2'] > 0])
+
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total de Células", f"{total_cells}")
+                    with col2:
+                        st.metric("Células > 0 hab/km²", f"{cells_above_0}")
+                    with col3:
+                        st.metric("Células > 5 hab/km²", f"{cells_above_5}", 
+                                 delta="Críticas" if cells_above_5 > 0 else None,
+                                 delta_color="inverse")
+
+                    st.markdown("---")
+
+                    # Filtros
+                    st.markdown("### 🔍 Filtrar Células")
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        densidade_filter = st.selectbox(
+                            "Filtrar por densidade",
+                            options=["Todas as células", "Somente > 0 hab/km²", "Somente > 5 hab/km²"],
+                            index=1
+                        )
+
+                    with col2:
+                        sort_option = st.selectbox(
+                            "Ordenar por",
+                            options=["Densidade (maior → menor)", "Densidade (menor → maior)", 
+                                    "População (maior → menor)", "População (menor → maior)"],
+                            index=0
+                        )
+
+                    # Aplicar filtros
+                    filtered_cells = detailed_cells.copy()
+
+                    if densidade_filter == "Somente > 0 hab/km²":
+                        filtered_cells = filtered_cells[filtered_cells['Densidade_hab_km2'] > 0]
+                    elif densidade_filter == "Somente > 5 hab/km²":
+                        filtered_cells = filtered_cells[filtered_cells['Densidade_hab_km2'] > 5]
+
+                    # Aplicar ordenação
+                    if sort_option == "Densidade (maior → menor)":
+                        filtered_cells = filtered_cells.sort_values('Densidade_hab_km2', ascending=False)
+                    elif sort_option == "Densidade (menor → maior)":
+                        filtered_cells = filtered_cells.sort_values('Densidade_hab_km2', ascending=True)
+                    elif sort_option == "População (maior → menor)":
+                        filtered_cells = filtered_cells.sort_values('Populacao', ascending=False)
+                    elif sort_option == "População (menor → maior)":
+                        filtered_cells = filtered_cells.sort_values('Populacao', ascending=True)
+
+                    # Formatar a tabela para exibição
+                    display_df = filtered_cells.copy()
+                    display_df['Densidade_hab_km2'] = display_df['Densidade_hab_km2'].round(2)
+                    display_df['Area_km2'] = display_df['Area_km2'].round(4)
+                    display_df['Latitude'] = display_df['Latitude'].round(6)
+                    display_df['Longitude'] = display_df['Longitude'].round(6)
+                    display_df['Populacao'] = display_df['Populacao'].astype(int)
+
+                    # Renomear colunas para português
+                    display_df = display_df.rename(columns={
+                        'ID_Celula': 'ID Célula',
+                        'Populacao': 'População',
+                        'Area_km2': 'Área (km²)',
+                        'Densidade_hab_km2': 'Densidade (hab/km²)',
+                        'Latitude': 'Latitude',
+                        'Longitude': 'Longitude'
                     })
-                stats_df = pd.DataFrame(stats_data)
-                st.dataframe(stats_df, use_container_width=True, hide_index=True)
 
-            # Display maps
-            st.markdown("---")
-            st.markdown("## 🗺️ Mapas de Densidade Populacional")
+                    st.markdown(f"### 📊 Tabela de Células ({len(filtered_cells)} registros)")
 
-            maps = [
-                ('map_flight_geography.png', 'Flight Geography'),
-                ('map_ground_risk_buffer.png', 'Ground Risk Buffer'),
-                ('map_adjacent_area.png', 'Adjacent Area')
-            ]
+                    # Adicionar destaque visual para células críticas
+                    def highlight_critical(row):
+                        if row['Densidade (hab/km²)'] > 5:
+                            return ['background-color: rgba(255, 0, 0, 0.15)'] * len(row)
+                        return [''] * len(row)
 
-            for map_file, map_title in maps:
-                map_path = os.path.join(analysis_output_dir, map_file)
-                if os.path.exists(map_path):
-                    st.markdown(f"### {map_title}")
-                    st.image(map_path, use_container_width=True)
+                    styled_df = display_df.style.apply(highlight_critical, axis=1)
+                    st.dataframe(styled_df, use_container_width=True, hide_index=True, height=400)
 
-            # Download results - KML and Maps together
-            st.markdown("---")
-            st.markdown("## 📥 Download dos Resultados")
+                    # Legenda
+                    st.markdown("""
+                    <div style="background: rgba(255, 0, 0, 0.15); padding: 0.5rem; border-radius: 5px; margin-top: 0.5rem;">
+                        <small>🔴 Células destacadas em vermelho possuem densidade > 5 hab/km² (área crítica)</small>
+                    </div>
+                    """, unsafe_allow_html=True)
 
-            col1, col2, col3, col4 = st.columns(4)
+                    # Botão de download do CSV
+                    st.markdown("---")
+                    st.markdown("### 📥 Download dos Dados das Células")
 
-            # KML download
-            with col1:
-                st.download_button(
-                    label="📥 Margens de Segurança",
-                    data=kml_data,
-                    file_name='safety_margins.kml',
-                    mime='application/vnd.google-earth.kml+xml',
-                    key='download_kml_final',
-                    use_container_width=True
-                )
+                    col1, col2, col3 = st.columns([1, 1, 2])
 
-            # Map downloads
-            map_labels = ['📥 Mapa FG', '📥 Mapa GRB', '📥 Mapa AA']
-            for idx, (map_file, map_title) in enumerate(maps):
-                map_path = os.path.join(analysis_output_dir, map_file)
-                if os.path.exists(map_path):
-                    with [col2, col3, col4][idx]:
-                        with open(map_path, 'rb') as f:
-                            file_data = f.read()
+                    with col1:
+                        # Download CSV completo
+                        csv_completo = detailed_cells.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Download Todas as Células (CSV)",
+                            data=csv_completo,
+                            file_name='celulas_grb_completo.csv',
+                            mime='text/csv',
+                            use_container_width=True,
+                            help="Baixar todas as células do GRB"
+                        )
+
+                    with col2:
+                        # Download CSV apenas células > 5
+                        if cells_above_5 > 0:
+                            cells_critical = detailed_cells[detailed_cells['Densidade_hab_km2'] > 5]
+                            csv_critical = cells_critical.to_csv(index=False).encode('utf-8')
                             st.download_button(
-                                label=map_labels[idx],
-                                data=file_data,
-                                file_name=map_file,
-                                mime='image/png',
+                                label="📥 Download Células Críticas (CSV)",
+                                data=csv_critical,
+                                file_name='celulas_grb_criticas.csv',
+                                mime='text/csv',
                                 use_container_width=True,
-                                key=f"download_map_{idx}"
+                                help="Baixar apenas células com densidade > 5 hab/km²"
+                            )
+                        else:
+                            st.button(
+                                label="📥 Download Células Críticas (CSV)",
+                                disabled=True,
+                                use_container_width=True,
+                                help="Nenhuma célula crítica encontrada"
                             )
 
-    # Footer
-    st.markdown("""
-    <div class="footer">
-        <p>© 2025 AL Drones - Todos os direitos reservados</p>
-        <p>Desenvolvido pela AL Drones | 
-        <a href="https://aldrones.com.br" target="_blank">aldrones.com.br</a></p>
-    </div>
-    """, unsafe_allow_html=True)
+                    with col3:
+                        st.info(f"💡 **Dica:** Use as coordenadas para criar No Fly Zones no planejamento de voo")
 
-
-if __name__ == '__main__':
-    main()

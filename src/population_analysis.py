@@ -156,6 +156,21 @@ def desenhar_contornos(ax, layers_poligonos, layer_order):
             )
 
 
+def extrair_vertices_celula(geometry):
+    """
+    Extrai os vértices de uma geometria de célula do grid.
+    Retorna lista de coordenadas (lon, lat) dos vértices em WGS84.
+    """
+    if geometry.geom_type == 'Polygon':
+        coords = list(geometry.exterior.coords)
+        return coords[:-1]  # Remove último ponto (repete o primeiro)
+    elif geometry.geom_type == 'MultiPolygon':
+        largest = max(geometry.geoms, key=lambda p: p.area)
+        coords = list(largest.exterior.coords)
+        return coords[:-1]
+    return []
+
+
 def calcular_estatisticas(dados_intersec, area_geom=None):
     """
     Calculate statistics from filtered grid.
@@ -189,9 +204,20 @@ def calcular_estatisticas(dados_intersec, area_geom=None):
 def analisar_celulas_grb(dados_combinados, area_geom):
     """
     Analyze cells within Ground Risk Buffer.
+    Retorna uma linha por célula com vértices em colunas separadas.
     
     Returns:
         tuple: (num_cells_above_5, detailed_cells_df)
+        
+    DataFrame columns:
+        - ID_Celula: Identificador único da célula
+        - Populacao: População total da célula
+        - Area_km2: Área da célula em km²
+        - Densidade_hab_km2: Densidade populacional
+        - Num_Vertices: Quantidade de vértices do polígono
+        - V1_Longitude, V1_Latitude: Coordenadas do vértice 1
+        - V2_Longitude, V2_Latitude: Coordenadas do vértice 2
+        - ... (continua para todos os vértices)
     """
     # Filter cells that have any population
     celulas_com_pop = dados_combinados[dados_combinados['TOTAL'] > 0].copy()
@@ -199,24 +225,55 @@ def analisar_celulas_grb(dados_combinados, area_geom):
     if celulas_com_pop.empty:
         return 0, pd.DataFrame()
     
-    # Calculate centroids in WGS84
+    # Convert to WGS84 to extract vertices
     celulas_wgs84 = celulas_com_pop.to_crs(epsg=4326)
-    celulas_wgs84['centroid'] = celulas_wgs84.geometry.centroid
-    celulas_wgs84['lat'] = celulas_wgs84['centroid'].y
-    celulas_wgs84['lon'] = celulas_wgs84['centroid'].x
     
-    # Create detailed dataframe
-    detailed_df = pd.DataFrame({
-        'ID_Celula': celulas_com_pop['ID'].values if 'ID' in celulas_com_pop.columns else celulas_com_pop.index,
-        'Populacao': celulas_com_pop['TOTAL'].values,
-        'Area_km2': celulas_com_pop['area_km2'].values,
-        'Densidade_hab_km2': celulas_com_pop['densidade_pop_km2'].values,
-        'Latitude': celulas_wgs84['lat'].values,
-        'Longitude': celulas_wgs84['lon'].values
-    })
+    # Create detailed dataframe with vertices as columns
+    detailed_rows = []
+    
+    for idx, row in celulas_wgs84.iterrows():
+        # Get cell ID - try different possible column names
+        if 'ID' in celulas_wgs84.columns:
+            cell_id = row['ID']
+        elif 'ID_UNICO' in celulas_wgs84.columns:
+            cell_id = row['ID_UNICO']
+        elif 'Cod_Grade' in celulas_wgs84.columns:
+            cell_id = row['Cod_Grade']
+        else:
+            cell_id = f'Cell_{idx}'
+        
+        populacao = row['TOTAL']
+        area_km2 = row['area_km2']
+        densidade = row['densidade_pop_km2']
+        
+        # Extract vertices
+        vertices = extrair_vertices_celula(row.geometry)
+        
+        if not vertices:
+            continue
+        
+        # Base data for the cell
+        cell_data = {
+            'ID_Celula': cell_id,
+            'Populacao': int(populacao),
+            'Area_km2': round(area_km2, 6),
+            'Densidade_hab_km2': round(densidade, 2),
+            'Num_Vertices': len(vertices)
+        }
+        
+        # Add vertex coordinates as separate columns
+        for v_num, (lon, lat) in enumerate(vertices, 1):
+            cell_data[f'V{v_num}_Longitude'] = round(lon, 7)
+            cell_data[f'V{v_num}_Latitude'] = round(lat, 7)
+        
+        detailed_rows.append(cell_data)
+    
+    detailed_df = pd.DataFrame(detailed_rows)
     
     # Sort by density (descending)
-    detailed_df = detailed_df.sort_values('Densidade_hab_km2', ascending=False)
+    if not detailed_df.empty:
+        detailed_df = detailed_df.sort_values('Densidade_hab_km2', ascending=False)
+        detailed_df = detailed_df.reset_index(drop=True)
     
     # Count cells above 5 hab/km²
     num_cells_above_5 = len(detailed_df[detailed_df['Densidade_hab_km2'] > 5])

@@ -672,16 +672,16 @@ def main():
             # Tabela Detalhada de Células do GRB
             if 'Ground Risk Buffer' in results and 'detailed_cells' in results['Ground Risk Buffer']:
                 detailed_cells = results['Ground Risk Buffer']['detailed_cells']
-
+            
                 if not detailed_cells.empty:
                     st.markdown("---")
                     st.markdown("## 📋 Células do Ground Risk Buffer")
-
+            
                     # Estatísticas rápidas
                     total_cells = len(detailed_cells)
                     cells_above_5 = len(detailed_cells[detailed_cells['Densidade_hab_km2'] > 5])
                     cells_above_0 = len(detailed_cells[detailed_cells['Densidade_hab_km2'] > 0])
-
+            
                     col1, col2, col3 = st.columns(3)
                     with col1:
                         st.metric("Total de Células", f"{total_cells}")
@@ -691,20 +691,20 @@ def main():
                         st.metric("Células > 5 hab/km²", f"{cells_above_5}", 
                                  delta="Críticas" if cells_above_5 > 0 else None,
                                  delta_color="inverse")
-
+            
                     st.markdown("---")
-
+            
                     # Filtros
                     st.markdown("### 🔍 Filtrar Células")
                     col1, col2 = st.columns(2)
-
+            
                     with col1:
                         densidade_filter = st.selectbox(
                             "Filtrar por densidade",
                             options=["Todas as células", "Somente > 0 hab/km²", "Somente > 5 hab/km²"],
                             index=1
                         )
-
+            
                     with col2:
                         sort_option = st.selectbox(
                             "Ordenar por",
@@ -712,15 +712,15 @@ def main():
                                     "População (maior → menor)", "População (menor → maior)"],
                             index=0
                         )
-
+            
                     # Aplicar filtros
                     filtered_cells = detailed_cells.copy()
-
+            
                     if densidade_filter == "Somente > 0 hab/km²":
                         filtered_cells = filtered_cells[filtered_cells['Densidade_hab_km2'] > 0]
                     elif densidade_filter == "Somente > 5 hab/km²":
                         filtered_cells = filtered_cells[filtered_cells['Densidade_hab_km2'] > 5]
-
+            
                     # Aplicar ordenação
                     if sort_option == "Densidade (maior → menor)":
                         filtered_cells = filtered_cells.sort_values('Densidade_hab_km2', ascending=False)
@@ -730,49 +730,65 @@ def main():
                         filtered_cells = filtered_cells.sort_values('Populacao', ascending=False)
                     elif sort_option == "População (menor → maior)":
                         filtered_cells = filtered_cells.sort_values('Populacao', ascending=True)
-
+            
                     # Formatar a tabela para exibição
                     display_df = filtered_cells.copy()
-                    display_df['Densidade_hab_km2'] = display_df['Densidade_hab_km2'].round(2)
-                    display_df['Area_km2'] = display_df['Area_km2'].round(4)
-                    display_df['Latitude'] = display_df['Latitude'].round(6)
-                    display_df['Longitude'] = display_df['Longitude'].round(6)
-                    display_df['Populacao'] = display_df['Populacao'].astype(int)
-
-                    # Renomear colunas para português
-                    display_df = display_df.rename(columns={
+                    
+                    # Arredondar valores numéricos básicos
+                    if 'Densidade_hab_km2' in display_df.columns:
+                        display_df['Densidade_hab_km2'] = display_df['Densidade_hab_km2'].round(2)
+                    if 'Area_km2' in display_df.columns:
+                        display_df['Area_km2'] = display_df['Area_km2'].round(6)
+                    if 'Populacao' in display_df.columns:
+                        display_df['Populacao'] = display_df['Populacao'].astype(int)
+                    
+                    # Arredondar coordenadas dos vértices (V1_Latitude, V1_Longitude, etc.)
+                    vertex_cols = [col for col in display_df.columns if col.startswith('V') and ('Latitude' in col or 'Longitude' in col)]
+                    for col in vertex_cols:
+                        if col in display_df.columns:  # Verificação extra de segurança
+                            display_df[col] = display_df[col].round(7)
+            
+                    # Renomear colunas para português (apenas as colunas base, manter nomes dos vértices)
+                    rename_dict = {
                         'ID_Celula': 'ID Célula',
                         'Populacao': 'População',
                         'Area_km2': 'Área (km²)',
                         'Densidade_hab_km2': 'Densidade (hab/km²)',
-                        'Latitude': 'Latitude',
-                        'Longitude': 'Longitude'
-                    })
-
+                        'Num_Vertices': 'Nº Vértices'
+                    }
+                    # Renomear apenas colunas que existem
+                    rename_dict = {k: v for k, v in rename_dict.items() if k in display_df.columns}
+                    display_df = display_df.rename(columns=rename_dict)
+            
                     st.markdown(f"### 📊 Tabela de Células ({len(filtered_cells)} registros)")
-
+                    
+                    # Informação sobre vértices
+                    if 'Nº Vértices' in display_df.columns and len(display_df) > 0:
+                        num_vertices = display_df['Nº Vértices'].iloc[0]
+                        st.info(f"💡 **Cada célula contém {num_vertices} vértices** com coordenadas nas colunas V1_Longitude, V1_Latitude, V2_Longitude, V2_Latitude, etc.")
+            
                     # Adicionar destaque visual para células críticas
                     def highlight_critical(row):
-                        if row['Densidade (hab/km²)'] > 5:
+                        if 'Densidade (hab/km²)' in row.index and row['Densidade (hab/km²)'] > 5:
                             return ['background-color: rgba(255, 0, 0, 0.15)'] * len(row)
                         return [''] * len(row)
-
+            
                     styled_df = display_df.style.apply(highlight_critical, axis=1)
                     st.dataframe(styled_df, use_container_width=True, hide_index=True, height=400)
-
+            
                     # Legenda
                     st.markdown("""
                     <div style="background: rgba(255, 0, 0, 0.15); padding: 0.5rem; border-radius: 5px; margin-top: 0.5rem;">
                         <small>🔴 Células destacadas em vermelho possuem densidade > 5 hab/km² (área crítica)</small>
                     </div>
                     """, unsafe_allow_html=True)
-
+            
                     # Botão de download do CSV
                     st.markdown("---")
                     st.markdown("### 📥 Download dos Dados das Células")
-
+            
                     col1, col2, col3 = st.columns([1, 1, 2])
-
+            
                     with col1:
                         # Download CSV completo
                         csv_completo = detailed_cells.to_csv(index=False).encode('utf-8')
@@ -782,9 +798,9 @@ def main():
                             file_name='celulas_grb_completo.csv',
                             mime='text/csv',
                             use_container_width=True,
-                            help="Baixar todas as células do GRB"
+                            help="Baixar todas as células do GRB com todos os vértices"
                         )
-
+            
                     with col2:
                         # Download CSV apenas células > 5
                         if cells_above_5 > 0:
@@ -805,9 +821,10 @@ def main():
                                 use_container_width=True,
                                 help="Nenhuma célula crítica encontrada"
                             )
-
+            
                     with col3:
-                        st.info(f"💡 **Dica:** Use as coordenadas para criar No Fly Zones no planejamento de voo")
+                        st.info(f"💡 **Dica:** Use as coordenadas dos vértices (V1, V2, V3, V4) para criar polígonos de No Fly Zones no planejamento de voo")
+
 
 
             # Detailed Population Statistics Table

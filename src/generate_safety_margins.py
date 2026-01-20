@@ -33,7 +33,7 @@ def calculate_grb_size(height):
     if height <= 120:
         return height
     else:
-        return 25 * sqrt(2 * height / 9.81) + 1.485
+        return 150/3.6 * sqrt(2 * height / 9.81) + 4/2
 
 
 def generate_safety_margins(
@@ -42,7 +42,7 @@ def generate_safety_margins(
     fg_size=0,
     height=100,
     cv_size=50,
-    adj_size=5000,
+    adj_size=7500,
     corner_style='square'
 ):
     """

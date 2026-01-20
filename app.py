@@ -469,7 +469,7 @@ def main():
                 )
             
             grb_preview = gsm.calculate_grb_size(height)
-            st.info(f"Ground Risk Buffer: {grb_preview:.2f} m | Adjacent Area: 5000m")
+            st.info(f"Ground Risk Buffer: {grb_preview:.2f} m | Adjacent Area: 7500m")
             
             if st.button("🚀 Iniciar Análise", type="primary"):
                 # Store parameters
